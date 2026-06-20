@@ -134,29 +134,32 @@ void processTargets(Target *targets, int targetCount) {
 void printReport(Config config, Target *targets, int targetCount) {
     int totalRecords = 0;
     int totalDuplicates = 0;
-    int targetsPassingSector = 0;
+    int passedFiltersCount = 0;
 
     for (int i = 0; i < targetCount; i++) {
         totalRecords += targets[i].count;
         totalDuplicates += targets[i].duplicates;
 
-        if (config.hasSector) {
-            if (targets[i].avgAzimuth >= config.az1 && targets[i].avgAzimuth <= config.az2) {
-                targetsPassingSector++;
-            }
-        } 
-        else {
-            targetsPassingSector++;
+        bool passSector = !config.hasSector || (targets[i].avgAzimuth >= config.az1 && targets[i].avgAzimuth <= config.az2);
+        bool passMinMarks = !config.hasMinMarks || (targets[i].count >= config.minMarks);
+
+        if (passSector && passMinMarks) {
+            passedFiltersCount++;
         }
     }
 
     printf("=== Отчёт по журналу: %s ===\n", config.filename);
     
     if (config.hasSector) {
-        int shown = (config.hasTop && config.n < targetsPassingSector) ? config.n : targetsPassingSector;
+        printf("Фильтр: сектор %.1f° — %.1f°\n", config.az1, config.az2);
+    }
+    if (config.hasMinMarks) {
+        printf("Фильтр: мин. отметок >= %d\n", config.minMarks);
+    }
 
-        printf("Фильтр: сектор %.1f° — %.1f°  (показаны %d из %d целей)\n", 
-            config.az1, config.az2, shown, targetCount);
+    if (config.hasSector || config.hasMinMarks) {
+        int shown = (config.hasTop && config.n < passedFiltersCount) ? config.n : passedFiltersCount;
+        printf("(показаны %d из %d целей)\n", shown, targetCount);
     }
 
     printf("Всего целей: %-2d |  Всего отметок: %-3d |  Дублей: %-2d\n\n", 
@@ -169,10 +172,11 @@ void printReport(Config config, Target *targets, int targetCount) {
     int index = -1; 
 
     for (int i = 0; i < targetCount; i++) {
-        if (config.hasSector) {
-            if (targets[i].avgAzimuth < config.az1 || targets[i].avgAzimuth > config.az2) {
-                continue; 
-            }
+        bool passSector = !config.hasSector || (targets[i].avgAzimuth >= config.az1 && targets[i].avgAzimuth <= config.az2);
+        bool passMinMarks = !config.hasMinMarks || (targets[i].count >= config.minMarks);
+
+        if (!passSector || !passMinMarks) {
+            continue; 
         }
 
         if (config.hasTop && printedCount >= config.n) {

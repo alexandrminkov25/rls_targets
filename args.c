@@ -6,16 +6,18 @@
 
 int parseArguments(int argc, char *argv[], Config *config) {
     if (argc < 2) {
-        fprintf(stderr, "Использование: %s <файл> [--sector <az1> <az2>] [--top <N>]\n", argv[0]);
+        fprintf(stderr, "Использование: %s <файл> [--sector <az1> <az2>] [--top <N>] [--min-marks <minMarks>]\n", argv[0]);
         return ARGUMENT_ERROR;
     }
 
     config->filename = argv[1];
     config->hasSector = false;
     config->hasTop = false;
+    config->hasMinMarks = false;
     config->az1 = 0.0f;
     config->az2 = 0.0f;
     config->n = 0;
+    config->hasMinMarks = 0;
 
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--sector") == 0) {
@@ -51,7 +53,7 @@ int parseArguments(int argc, char *argv[], Config *config) {
                 char *endptr;
                 config->n = (int)strtol(argv[++i], &endptr, 10);
 
-                if (*endptr != '\0') {
+                if (*endptr != '\0' || config->n < 0) {
                     fprintf(stderr, "Ошибка: Неверный формат аргумента для --top\n");
                     return ARGUMENT_ERROR;
                 }
@@ -63,6 +65,28 @@ int parseArguments(int argc, char *argv[], Config *config) {
                 return ARGUMENT_ERROR;
             }
         } 
+        else if (strcmp(argv[i], "--min-marks") == 0) {
+            if (config->hasMinMarks)  {
+                fprintf(stderr, "Ошибка: --min-marks уже указан\n");
+                return ARGUMENT_ERROR;
+            }
+
+            if (i + 1 < argc) {
+                char *endptr;
+                config->minMarks = (int)strtol(argv[++i], &endptr, 10);
+
+                if (*endptr != '\0' || config->minMarks < 0) {
+                    fprintf(stderr, "Ошибка: Неверный формат аргумента для --min-marks\n");
+                    return ARGUMENT_ERROR;
+                }
+
+                config->hasMinMarks = true;
+            } 
+            else {
+                fprintf(stderr, "Ошибка: Неверное количество аргументов для --min-marks\n");
+                return ARGUMENT_ERROR;
+            }
+        }
         else {
             fprintf(stderr, "Ошибка: Неизвестный аргумент %s\n", argv[i]);
             return ARGUMENT_ERROR;

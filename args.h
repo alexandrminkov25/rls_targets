@@ -8,8 +8,10 @@ typedef struct {
     float az1;
     float az2;
     int n;
+    int minMarks;
     bool hasSector;
-    bool hasTop;    
+    bool hasTop;
+    bool hasMinMarks;  
 } Config;
 
 int parseArguments(int argc, char *argv[], Config *config);
