@@ -49,34 +49,33 @@ generate_random_error() {
     esac
 }
 
-if [[ $# -lt 3 ]];
+SCENARIO=""
+PARAMS=()
+
+while [[ $# -gt 0 ]]
+do
+    case "$1" in
+        --scenario) SCENARIO="$2"; shift; shift ;;
+        *)          PARAMS+=("$1"); shift ;;
+    esac
+done
+
+if [[ ${#PARAMS[@]} -lt 3 ]]
 then
     echo "Ошибка: Недостаточно аргументов"
-    echo "Использование: $0 <число_целей> <отметок_на_цель> <выходной_файл> [seed]"
+    echo "Использование: $0 <число_целей> <отметок_на_цель> <выходной_файл> [seed] [--scenario name]"
     exit 1
 fi
 
-TARGETS_COUNT=$1
-POINTS_PER_TARGET=$2
-OUTPUT_FILE=$3
-SEED=${4:-$$}
+TARGETS_COUNT=${PARAMS[0]}
+POINTS_PER_TARGET=${PARAMS[1]}
+OUTPUT_FILE=${PARAMS[2]}
+SEED=${PARAMS[3]:-$$}
 RANDOM=$SEED
 
 OUTPUT_DIR="test_data"
 mkdir -p $OUTPUT_DIR
 OUTPUT_FILE="$OUTPUT_DIR/$OUTPUT_FILE"
-
-if [[ ! "$TARGETS_COUNT" =~ ^[0-9]+$ ]];
-then
-    echo "Ошибка: Число целей должно быть положительным целым числом"
-    exit 1
-fi
-
-if [[ ! "$POINTS_PER_TARGET" =~ ^[0-9]+$ ]];
-then
-    echo "Ошибка: Число отметок на цель должно быть положительным целым числом"
-    exit 1
-fi
 
 if [[ "$OUTPUT_FILE" != *.csv ]];
 then
@@ -84,62 +83,143 @@ then
     exit 1
 fi
 
-echo "Генерация данных для $TARGETS_COUNT целей с $POINTS_PER_TARGET отметками на цель в файл '$OUTPUT_FILE'"
 echo "Используется seed: $SEED"
 
 printf "# time_ms  target_id  range_m  azimuth_deg\n" > "$OUTPUT_FILE"
 
 generate_random 3 5;
 ERRORS_COUNT=$RAND_VAL
+TOTAL_ERRORS=$ERRORS_COUNT
 
 generate_random 2 3;
 DUPLICATES_COUNT=$RAND_VAL
+TOTAL_DUPES=$DUPLICATES_COUNT
 
-for (( t=1; t<=TARGETS_COUNT; t++ ))
-do
-    generate_random 1 255;
-    TARGET_ID=$RAND_VAL
+LAST_ROW=()
 
-    for (( p=1; p<=POINTS_PER_TARGET; p++ ))
+if [[ "$SCENARIO" == "minmarks" ]]
+then
+    TARGETS_COUNT=5
+    DISTRIBUTION=(1 2 3 5 8)
+    
+    for (( t=1; t<=5; t++ ))
     do
-        TIME_MS=$(( p * 1000 ))
+        generate_random 1 255;
+        TARGET_ID=$RAND_VAL
 
-        generate_random 1000 50000;
-        RANGE_M=$RAND_VAL
+        TARGET_POINTS=${DISTRIBUTION[($t - 1)]}
 
-        generate_random_float 0 3599;
-        AZIMUTH_DEG=$RAND_FLOAT
+        for (( p=1; p<=TARGET_POINTS; p++ ))
+        do
+            TIME_MS=$(( p * 1000 ))
 
-        printf_row "$OUTPUT_FILE" "$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG"
-        LAST_ROW=("$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG")
+            generate_random 1000 50000;
+            RANGE_M=$RAND_VAL
 
-        generate_random 1 100
-        if [[ $ERRORS_COUNT -gt 0 && $RAND_VAL -le 40 ]];
-        then
-            generate_random_error >> "$OUTPUT_FILE"
-            ((ERRORS_COUNT--))
-        fi
+            generate_random_float 0 3599;
+            AZIMUTH_DEG=$RAND_FLOAT
+            
+            printf_row "$OUTPUT_FILE" "$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG"
+            LAST_ROW=("$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG")
 
-        generate_random 1 100
-        if [[ $DUPLICATES_COUNT -gt 0 && $RAND_VAL -le 40 ]];
-        then
-            generate_random -500 500
-            NEW_RANGE_M=$((LAST_ROW[2] + RAND_VAL))
+            generate_random 1 100
+            if [[ $ERRORS_COUNT -gt 0 && $RAND_VAL -le 40 ]];
+            then
+                generate_random_error >> "$OUTPUT_FILE"
+                ((ERRORS_COUNT--))
+            fi
 
-            printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${NEW_RANGE_M}" "${LAST_ROW[3]}"
-            ((DUPLICATES_COUNT--))
-        fi
+            generate_random 1 100
+            if [[ $DUPLICATES_COUNT -gt 0 && $RAND_VAL -le 40 ]];
+            then
+                generate_random -500 500
+                NEW_RANGE_M=$((LAST_ROW[2] + RAND_VAL))
+
+                printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${NEW_RANGE_M}" "${LAST_ROW[3]}"
+                ((DUPLICATES_COUNT--))
+            fi
+        done
     done
-done
+    
+    while [[ $ERRORS_COUNT -gt 0 ]];
+    do
+        generate_random_error >> "$OUTPUT_FILE"
+        ((ERRORS_COUNT--))
+    done
 
-while [[ $ERRORS_COUNT -gt 0 ]];
-do
-    generate_random_error >> "$OUTPUT_FILE"
-    ((ERRORS_COUNT--))
-done
+    while [[ $DUPLICATES_COUNT -gt 0 ]];
+    do
+        printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${LAST_ROW[2]}" "${LAST_ROW[3]}"
+        ((DUPLICATES_COUNT--))
+    done
 
-while [[ $DUPLICATES_COUNT -gt 0 ]];
-do
-    printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${LAST_ROW[2]}" "${LAST_ROW[3]}"
-    ((DUPLICATES_COUNT--))
-done
+    echo "Сценарий: minmarks"
+    echo "Уникальных целей: 5"
+    echo "Распределение: 1, 2, 3, 5, 8"
+    echo "Ошибок вставлено: $TOTAL_ERRORS"
+    echo "Дублей вставлено: $TOTAL_DUPES"
+    echo "Файл: $OUTPUT_FILE"
+else
+    if [[ ! "$TARGETS_COUNT" =~ ^[0-9]+$ ]];
+    then
+        echo "Ошибка: Число целей должно быть положительным целым числом"
+        exit 1
+    fi
+
+    if [[ ! "$POINTS_PER_TARGET" =~ ^[0-9]+$ ]];
+    then
+        echo "Ошибка: Число отметок на цель должно быть положительным целым числом"
+        exit 1
+    fi
+
+    echo "Генерация данных для $TARGETS_COUNT целей с $POINTS_PER_TARGET отметками на цель в файл '$OUTPUT_FILE'"
+
+    for (( t=1; t<=TARGETS_COUNT; t++ ))
+    do
+        generate_random 1 255;
+        TARGET_ID=$RAND_VAL
+
+        for (( p=1; p<=POINTS_PER_TARGET; p++ ))
+        do
+            TIME_MS=$(( p * 1000 ))
+
+            generate_random 1000 50000;
+            RANGE_M=$RAND_VAL
+
+            generate_random_float 0 3599;
+            AZIMUTH_DEG=$RAND_FLOAT
+
+            printf_row "$OUTPUT_FILE" "$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG"
+            LAST_ROW=("$TIME_MS" "$TARGET_ID" "$RANGE_M" "$AZIMUTH_DEG")
+
+            generate_random 1 100
+            if [[ $ERRORS_COUNT -gt 0 && $RAND_VAL -le 40 ]];
+            then
+                generate_random_error >> "$OUTPUT_FILE"
+                ((ERRORS_COUNT--))
+            fi
+
+            generate_random 1 100
+            if [[ $DUPLICATES_COUNT -gt 0 && $RAND_VAL -le 40 ]];
+            then
+                generate_random -500 500
+                NEW_RANGE_M=$((LAST_ROW[2] + RAND_VAL))
+
+                printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${NEW_RANGE_M}" "${LAST_ROW[3]}"
+                ((DUPLICATES_COUNT--))
+            fi
+        done
+    done
+
+    while [[ $ERRORS_COUNT -gt 0 ]];
+    do
+        generate_random_error >> "$OUTPUT_FILE"
+        ((ERRORS_COUNT--))
+    done
+
+    while [[ $DUPLICATES_COUNT -gt 0 ]];
+    do
+        printf_row "$OUTPUT_FILE" "${LAST_ROW[0]}" "${LAST_ROW[1]}" "${LAST_ROW[2]}" "${LAST_ROW[3]}"
+        ((DUPLICATES_COUNT--))
+    done
+fi
