@@ -1,5 +1,5 @@
 CC = gcc
-TARGET = rls_analyze.exe
+TARGET = rls_analyze
 OBJS = main.o tracks.o args.o file.o
 
 all: $(TARGET)
