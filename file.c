@@ -20,14 +20,11 @@ int readFile(const char *filename, Record *records, int *numRecords) {
         lineCount++;
 
         if (buffer[0] == '#' || buffer[0] == '\n' || buffer[0] == '\r') {
-            lineCount--;
             continue;
         }
 
-        int timeMs, rangeM;
-        unsigned int targetId;
-        float azimuthDeg;
-        int parsed = sscanf(buffer, "%d %u %d %f", &timeMs, &targetId, &rangeM, &azimuthDeg);
+        float timeMs, targetId, rangeM, azimuthDeg;
+        int parsed = sscanf(buffer, "%f %f %f %f", &timeMs, &targetId, &rangeM, &azimuthDeg);
 
         if (parsed != 4) {
             fprintf(stderr, "Строка %d: пропущена — неверный формат (ожидалось 4 поля, найдено %d)\n", lineCount, parsed);
@@ -35,8 +32,14 @@ int readFile(const char *filename, Record *records, int *numRecords) {
             continue;
         }
 
+        if (timeMs <= 0) {
+            fprintf(stderr, "Строка %d: пропущена — timeMs=%f должно быть положительным\n", lineCount, timeMs);
+            skippedCount++;
+            continue;
+        }
+
         if (targetId < 1 || targetId > 255) {
-            fprintf(stderr, "Строка %d: пропущена — target_id=%u вне диапазона [1, 255]\n", lineCount, targetId);
+            fprintf(stderr, "Строка %d: пропущена — target_id=%f вне диапазона [1, 255]\n", lineCount, targetId);
             skippedCount++;
             continue;
         }
@@ -48,7 +51,7 @@ int readFile(const char *filename, Record *records, int *numRecords) {
         }
 
         if (rangeM <= 0) {
-            fprintf(stderr, "Строка %d: пропущена — range_m=%d должно быть положительным\n", lineCount, rangeM);
+            fprintf(stderr, "Строка %d: пропущена — range_m=%f должно быть положительным\n", lineCount, rangeM);
             skippedCount++;
             continue;
         }
